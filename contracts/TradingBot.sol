@@ -126,9 +126,7 @@ contract DyDxFlashLoan is Structs {
     }
 
     // the DyDx will call `callFunction(address sender, Info memory accountInfo, bytes memory data) public` after during `operate` call
-    function flashloan(address token, uint256 amount, bytes memory data)
-    internal
-    {
+    function flashloan(address token, uint256 amount, bytes memory data) internal {
         IERC20(token).approve(address(pool), amount + 1);
         Info[] memory infos = new Info[](1);
         ActionArgs[] memory args = new ActionArgs[](3);
