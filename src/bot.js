@@ -1,4 +1,5 @@
-require('dotenv').config()
+const dotenv = require('dotenv')
+dotenv.config();
 require('console.table')
 const express = require('express')
 const path = require('path')
@@ -9,6 +10,8 @@ const Web3 = require('web3')
 const axios = require('axios')
 const moment = require('moment-timezone')
 
+let accounts
+
 // SERVER CONFIG
 const PORT = process.env.PORT || 5000
 const app = express();
@@ -17,12 +20,14 @@ app.use(express.static(path.join(__dirname, 'public')))
 app.use(cors({credentials: true, origin: '*'}))
 
 // WEB3 CONFIG
-const web3 = new Web3(process.env.RPC_URL)
-web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY)
+// const web3 = new Web3(process.env.RPC_URL)
+// web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY)
 
-// const HDWalletProvider = require('@truffle/hdwallet-provider');
-// const mnemonic = process.env.MNEMONIC;
-// const web3 = new Web3(new HDWalletProvider(mnemonic, process.env.RPC_URL));
+
+
+const HDWalletProvider = require('@truffle/hdwallet-provider');
+const mnemonic = process.env.MNEMONIC;
+const web3 = new Web3(new HDWalletProvider(mnemonic, process.env.RPC_URL));
 
 const ZRX_EXCHANGE_ADDRESS = '0x61935CbDd02287B511119DDb11Aeb42F1593b7Ef'
 const ZRX_EXCHANGE_ABI = require('./abis/ZrxExchange');
@@ -38,13 +43,18 @@ const FILL_ORDER_ABI = {"constant":false,"inputs":[{"components":[{"internalType
 const DAI = 'DAI'
 const WETH = 'WETH'
 const USDC = 'USDC'
+const USDT = 'USDT'
+const BUSD = 'BUSD'
+
 
 
 // ASSET ADDRESSES
 const ASSET_ADDRESSES = {
-	DAI: '0x6b175474e89094c44da98b954eedeac495271d0f',
+	DAI:  '0x6b175474e89094c44da98b954eedeac495271d0f',
 	WETH: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
 	USDC: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+	USDT: '0xdac17f958d2ee523a2206206994597c13d831ec7',
+	BUSD: '0x4fabb145d64652a948d72533023f6e7a623c7c53',
 }
 
 // DISPLAY LOGIC
@@ -107,6 +117,10 @@ const toTokens = (tokenAmount, symbol) => {
 		case WETH: // 18 decimals
 			return web3.utils.toWei(tokenAmount, 'Ether')
 		case USDC: // 6 decimals
+			return web3.utils.fromWei(web3.utils.toWei(tokenAmount), 'Szabo')
+		case BUSD:
+			return web3.utils.toWei(tokenAmount, 'Ether')
+		case USDT: // 6 decimals
 			return web3.utils.fromWei(web3.utils.toWei(tokenAmount), 'Szabo')
 	}
 }
@@ -199,6 +213,7 @@ async function checkArb(args) {
 		// Determine if profitable
 		const profitable = netProfit.toString() > '0'
 
+
 		// If profitable, then stop looking and trade!
 		if (profitable) {
 			// Skip if another profitable arb has already been found
@@ -235,7 +250,7 @@ async function checkArb(args) {
 
 // TRADE EXECUTION
 async function trade(flashTokenSymbol, flashTokenAddress, arbTokenAddress, orderJson, fillAmount, oneInchExchangeData) {
-	const accounts = await web3.eth.getAccounts();
+	// const accounts = await web3.eth.getAccounts();
 	const FLASH_AMOUNT = toTokens('10', flashTokenSymbol) // 10,000 WETH
 	const FROM_TOKEN = flashTokenAddress // WETH
 	const FROM_AMOUNT = fillAmount // '1000000'
@@ -357,11 +372,16 @@ async function checkOrderBook(baseAssetSymbol, quoteAssetSymbol) {
 	bids.forEach((o) => {
 		checkArb({zrxOrder: o.order, assetOrder: [baseAssetSymbol, quoteAssetSymbol, baseAssetSymbol]}) // E.G. WETH, DAI, WETH
 	})
+
+	// for (const o of bids) {
+	// 	await checkArb({zrxOrder: o.order, assetOrder: [baseAssetSymbol, quoteAssetSymbol, baseAssetSymbol]}) // E.G. WETH, DAI, WETH
+	// }
 }
 
 // CHECK MARKETS
 let checkingMarkets = false
 async function checkMarkets() {
+	accounts = await web3.eth.getAccounts();
 	if(checkingMarkets) {
 		return
 	}
@@ -374,7 +394,16 @@ async function checkMarkets() {
 	console.log(`Fetching market data @ ${now()} ...\n`)
 	checkingMarkets = true
 	try {
+		// await checkOrderBook(WETH, DAI)
+		await checkOrderBook(WETH, USDC)
 		await checkOrderBook(WETH, DAI)
+		await checkOrderBook(WETH, USDT)
+		await checkOrderBook(WETH, BUSD)
+
+		await checkOrderBook(USDC, WETH)
+		await checkOrderBook(DAI, WETH)
+		await checkOrderBook(USDT, WETH)
+		await checkOrderBook(BUSD, WETH)
 	} catch (error) {
 		console.error(error)
 		checkingMarkets = false
@@ -390,3 +419,7 @@ playSound()
 // Check markets every n seconds
 const POLLING_INTERVAL = process.env.POLLING_INTERVAL || 3000 // 3 seconds
 const marketChecker = setInterval(async () => { await checkMarkets() }, POLLING_INTERVAL)
+
+// checkMarkets()
+
+
