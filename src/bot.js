@@ -401,7 +401,7 @@ async function checkMarkets() {
 		await checkOrderBook(WETH, BUSD)
 
 		await checkOrderBook(USDC, WETH)
-		await checkOrderBook(DAI, WETH)
+		await checkOrderBook(DAI,  WETH)
 		await checkOrderBook(USDT, WETH)
 		await checkOrderBook(BUSD, WETH)
 	} catch (error) {
