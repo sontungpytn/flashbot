@@ -10,7 +10,6 @@ const Web3 = require('web3')
 const axios = require('axios')
 const moment = require('moment-timezone')
 
-let accounts
 
 // SERVER CONFIG
 const PORT = process.env.PORT || 5000
@@ -20,13 +19,16 @@ app.use(express.static(path.join(__dirname, 'public')))
 app.use(cors({credentials: true, origin: '*'}))
 
 // WEB3 CONFIG
-// const web3 = new Web3(process.env.RPC_URL)
-// web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY)
+const web3 = new Web3(process.env.RPC_URL)
+const account = web3.eth.accounts.privateKeyToAccount(process.env.PRIVATE_KEY)
+console.log(account)
+web3.eth.accounts.wallet.add(account);
+web3.eth.defaultAccount = account.address;
 
-
-const HDWalletProvider = require('@truffle/hdwallet-provider')
-const mnemonic = process.env.MNEMONIC
-const web3 = new Web3(new HDWalletProvider(mnemonic, process.env.RPC_URL))
+//
+// const HDWalletProvider = require('@truffle/hdwallet-provider')
+// const mnemonic = process.env.MNEMONIC
+// const web3 = new Web3(new HDWalletProvider(mnemonic, process.env.RPC_URL))
 
 const ZRX_EXCHANGE_ADDRESS = '0x61935CbDd02287B511119DDb11Aeb42F1593b7Ef'
 const ZRX_EXCHANGE_ABI = require('./abis/ZrxExchange')
@@ -402,7 +404,7 @@ async function trade (flashTokenSymbol, flashTokenAddress, arbTokenAddress, orde
 		data, // bytes calldata zrxData,
 		oneInchExchangeData.tx.data //bytes calldata oneInchData
 	).send({
-		from: accounts[0],
+		from: account.address,
 		gas: process.env.GAS_LIMIT,
 		gasPrice: web3.utils.toWei(process.env.GAS_PRICE, 'Gwei')
 	})
@@ -436,7 +438,6 @@ async function checkOrderBook (baseAssetSymbol, quoteAssetSymbol) {
 let checkingMarkets = false
 
 async function checkMarkets () {
-	accounts = await web3.eth.getAccounts()
 	if (checkingMarkets) {
 		return
 	}
@@ -454,11 +455,6 @@ async function checkMarkets () {
 		await checkOrderBook(WETH, DAI)
 		await checkOrderBook(WETH, USDT)
 		await checkOrderBook(WETH, BUSD)
-
-		await checkOrderBook(USDC, WETH)
-		await checkOrderBook(DAI, WETH)
-		await checkOrderBook(USDT, WETH)
-		await checkOrderBook(BUSD, WETH)
 	} catch (error) {
 		console.error(error)
 		checkingMarkets = false
