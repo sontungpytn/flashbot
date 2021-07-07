@@ -9,6 +9,34 @@ const cors = require('cors')
 const Web3 = require('web3')
 const axios = require('axios')
 const moment = require('moment-timezone')
+let marketChecker
+
+let gasPrice = process.env.GAS_PRICE || "50";
+const API_KEY = process.env.API_KEY
+const getGasPrice = async () => {
+	try {
+		const url = `https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${API_KEY}`
+		const {data} = await axios.get(url)
+		if (data && data.result && data.result.FastGasPrice) {
+			const fastGasPrice = data.result.FastGasPrice
+			if (fastGasPrice !== gasPrice) {
+				gasPrice = fastGasPrice
+				console.log('Set new Gas Price: ', gasPrice)
+			}
+		}
+	} catch (err) {
+		console.error('Error on getting gas price')
+		console.error(err)
+	}
+}
+
+const GAS_INTERVAL = 5000
+getGasPrice()
+setInterval(async () => {
+	await getGasPrice()
+}, GAS_INTERVAL)
+
+
 
 
 // SERVER CONFIG
@@ -21,9 +49,68 @@ app.use(cors({credentials: true, origin: '*'}))
 // WEB3 CONFIG
 const web3 = new Web3(process.env.RPC_URL)
 const account = web3.eth.accounts.privateKeyToAccount(process.env.PRIVATE_KEY)
-console.log(account)
-web3.eth.accounts.wallet.add(account);
-web3.eth.defaultAccount = account.address;
+web3.eth.accounts.wallet.add(account)
+web3.eth.defaultAccount = account.address
+
+
+const setupListener = () => {
+
+	const eventProvider = new Web3.providers.WebsocketProvider(process.env.WSS_URL)
+	const eventWeb3 = new Web3(eventProvider)
+
+	const eventTraderContract = new eventWeb3.eth.Contract(TRADER_ABI, TRADER_ADDRESS)
+
+	console.log('Event')
+
+	eventTraderContract.events.StartBalance().on('data', function (event) {
+		console.log('###: StartBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.EndBalance().on('data', function (event) {
+		console.log('###: EndBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.ZRXBeforeDAIBalance().on('data', function (event) {
+		console.log('###: ZRXBeforeDAIBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.ZRXAfterDAIBalance().on('data', function (event) {
+		console.log('###: ZRXAfterDAIBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.ZRXBeforeWETHBalance().on('data', function (event) {
+		console.log('###: ZRXBeforeWETHBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.ZRXAfterWETHBalance().on('data', function (event) {
+		console.log('###: ZRXAfterWETHBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.OneInchBeforeWETHBalance().on('data', function (event) {
+		console.log('###: OneInchBeforeWETHBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.OneInchAfterWETHBalance().on('data', function (event) {
+		console.log('###: OneInchAfterWETHBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.OneInchBeforeDAIBalance().on('data', function (event) {
+		console.log('###: OneInchBeforeDAIBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.OneInchAfterDAIBalance().on('data', function (event) {
+		console.log('###: OneInchAfterDAIBalance:', event.returnValues)
+	}).on('error', console.error)
+
+
+	eventTraderContract.events.FlashTokenBeforeBalance().on('data', function (event) {
+		console.log('###: FlashTokenBeforeBalance:', event.returnValues)
+	}).on('error', console.error)
+
+	eventTraderContract.events.FlashTokenAfterBalance().on('data', function (event) {
+		console.log('###: FlashTokenAfterBalance:', event.returnValues)
+	}).on('error', console.error)
+}
 
 //
 // const HDWalletProvider = require('@truffle/hdwallet-provider')
@@ -39,41 +126,58 @@ const TRADER_ADDRESS = process.env.CONTRACT_ADDRESS
 const traderContract = new web3.eth.Contract(TRADER_ABI, TRADER_ADDRESS)
 const FILL_ORDER_ABI = {
 	'constant': false,
-	'inputs': [{
-		'components': [{'internalType': 'address', 'name': 'makerAddress', 'type': 'address'}, {
-			'internalType': 'address',
-			'name': 'takerAddress',
-			'type': 'address'
-		}, {'internalType': 'address', 'name': 'feeRecipientAddress', 'type': 'address'}, {
-			'internalType': 'address',
-			'name': 'senderAddress',
-			'type': 'address'
-		}, {'internalType': 'uint256', 'name': 'makerAssetAmount', 'type': 'uint256'}, {
-			'internalType': 'uint256',
-			'name': 'takerAssetAmount',
-			'type': 'uint256'
-		}, {'internalType': 'uint256', 'name': 'makerFee', 'type': 'uint256'}, {
-			'internalType': 'uint256',
-			'name': 'takerFee',
-			'type': 'uint256'
-		}, {'internalType': 'uint256', 'name': 'expirationTimeSeconds', 'type': 'uint256'}, {
-			'internalType': 'uint256',
-			'name': 'salt',
-			'type': 'uint256'
-		}, {'internalType': 'bytes', 'name': 'makerAssetData', 'type': 'bytes'}, {
+	'inputs': [
+		{
+			'components': [
+				{'internalType': 'address', 'name': 'makerAddress', 'type': 'address'},
+				{
+					'internalType': 'address',
+					'name': 'takerAddress',
+					'type': 'address'
+				},
+				{'internalType': 'address', 'name': 'feeRecipientAddress', 'type': 'address'},
+				{
+					'internalType': 'address',
+					'name': 'senderAddress',
+					'type': 'address'
+				},
+				{'internalType': 'uint256', 'name': 'makerAssetAmount', 'type': 'uint256'},
+				{
+					'internalType': 'uint256',
+					'name': 'takerAssetAmount',
+					'type': 'uint256'
+				},
+				{'internalType': 'uint256', 'name': 'makerFee', 'type': 'uint256'},
+				{
+					'internalType': 'uint256',
+					'name': 'takerFee',
+					'type': 'uint256'
+				},
+				{'internalType': 'uint256', 'name': 'expirationTimeSeconds', 'type': 'uint256'},
+				{
+					'internalType': 'uint256',
+					'name': 'salt',
+					'type': 'uint256'
+				},
+				{'internalType': 'bytes', 'name': 'makerAssetData', 'type': 'bytes'},
+				{
+					'internalType': 'bytes',
+					'name': 'takerAssetData',
+					'type': 'bytes'
+				},
+				{'internalType': 'bytes', 'name': 'makerFeeAssetData', 'type': 'bytes'},
+				{
+					'internalType': 'bytes',
+					'name': 'takerFeeAssetData',
+					'type': 'bytes'
+				}],
+			'internalType': 'struct LibOrder.Order', 'name': 'order', 'type': 'tuple'
+		},
+		{'internalType': 'uint256', 'name': 'takerAssetFillAmount', 'type': 'uint256'}, {
 			'internalType': 'bytes',
-			'name': 'takerAssetData',
+			'name': 'signature',
 			'type': 'bytes'
-		}, {'internalType': 'bytes', 'name': 'makerFeeAssetData', 'type': 'bytes'}, {
-			'internalType': 'bytes',
-			'name': 'takerFeeAssetData',
-			'type': 'bytes'
-		}], 'internalType': 'struct LibOrder.Order', 'name': 'order', 'type': 'tuple'
-	}, {'internalType': 'uint256', 'name': 'takerAssetFillAmount', 'type': 'uint256'}, {
-		'internalType': 'bytes',
-		'name': 'signature',
-		'type': 'bytes'
-	}],
+		}],
 	'name': 'fillOrder',
 	'outputs': [{
 		'components': [{
@@ -153,16 +257,7 @@ async function fetchOneInchExchangeData (args) {
 }
 
 // UTILITIES
-const now = () => (moment().tz('America/Chicago').format())
-
-const SOUND_FILE = './ding.mp3'
-const playSound = () => {
-	player.play(SOUND_FILE, function (err) {
-		if (err) {
-			console.log('Error playing sound!')
-		}
-	})
-}
+const now = () => (moment().tz('Asia/Ho_Chi_Minh').format())
 
 
 // FORMATTERS
@@ -237,6 +332,7 @@ async function checkArb (args) {
 	// Fetch order status
 	const orderInfo = await zrxExchangeContract.methods.getOrderInfo(orderTuple).call()
 
+
 	// Skip order if it's been partially filled
 	if (orderInfo.orderTakerAssetFilledAmount.toString() !== '0') {
 		console.log('Order partially filled')
@@ -259,7 +355,7 @@ async function checkArb (args) {
 		const outputAssetAmount = oneInchExchangeData.toTokenAmount
 
 		// Calculate estimated gas cost
-		let estimatedGasFee = process.env.ESTIMATED_GAS.toString() * web3.utils.toWei(process.env.GAS_PRICE.toString(), 'Gwei')
+		let estimatedGasFee = process.env.ESTIMATED_GAS.toString() * web3.utils.toWei(gasPrice, 'Gwei')
 		// estimatedGasFee = web3.utils.fromWei(estimatedGasFee.toString(), 'Ether')
 
 		// Calculate net profit
@@ -347,54 +443,6 @@ async function trade (flashTokenSymbol, flashTokenAddress, arbTokenAddress, orde
 	//
 	// console.log('#####: receipt: ', receipt)
 
-	traderContract.events.StartBalance().on('data', function (event) {
-		console.log('###: StartBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.EndBalance().on('data', function (event) {
-		console.log('###: EndBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.ZRXBeforeDAIBalance().on('data', function (event) {
-		console.log('###: ZRXBeforeDAIBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.ZRXAfterDAIBalance().on('data', function (event) {
-		console.log('###: ZRXAfterDAIBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.ZRXBeforeWETHBalance().on('data', function (event) {
-		console.log('###: ZRXBeforeWETHBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.ZRXAfterWETHBalance().on('data', function (event) {
-		console.log('###: ZRXAfterWETHBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.OneInchBeforeWETHBalance().on('data', function (event) {
-		console.log('###: OneInchBeforeWETHBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.OneInchAfterWETHBalance().on('data', function (event) {
-		console.log('###: OneInchAfterWETHBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.OneInchBeforeDAIBalance().on('data', function (event) {
-		console.log('###: OneInchBeforeDAIBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.OneInchAfterDAIBalance().on('data', function (event) {
-		console.log('###: OneInchAfterDAIBalance:', event.returnValues)
-	}).on('error', console.error)
-
-
-	traderContract.events.FlashTokenBeforeBalance().on('data', function (event) {
-		console.log('###: FlashTokenBeforeBalance:', event.returnValues)
-	}).on('error', console.error)
-
-	traderContract.events.FlashTokenAfterBalance().on('data', function (event) {
-		console.log('###: FlashTokenAfterBalance:', event.returnValues)
-	}).on('error', console.error)
 
 	// Perform Trade
 	const receipt = await traderContract.methods.getFlashloan(
@@ -406,11 +454,13 @@ async function trade (flashTokenSymbol, flashTokenAddress, arbTokenAddress, orde
 	).send({
 		from: account.address,
 		gas: process.env.GAS_LIMIT,
-		gasPrice: web3.utils.toWei(process.env.GAS_PRICE, 'Gwei')
+		gasPrice: web3.utils.toWei(gasPrice, 'Gwei')
 	})
 
 	console.log('#####: receipt: ', receipt)
 
+	// Continue to find new trade
+	startChecker()
 }
 
 
@@ -443,7 +493,7 @@ async function checkMarkets () {
 	}
 
 	// Stop checking markets if already found
-	if (profitableArbFound) {
+	if (profitableArbFound && marketChecker) {
 		clearInterval(marketChecker)
 	}
 
@@ -453,8 +503,8 @@ async function checkMarkets () {
 		// await checkOrderBook(WETH, DAI)
 		await checkOrderBook(WETH, USDC)
 		await checkOrderBook(WETH, DAI)
-		await checkOrderBook(WETH, USDT)
-		await checkOrderBook(WETH, BUSD)
+		// await checkOrderBook(WETH, USDT)
+		// await checkOrderBook(WETH, BUSD)
 	} catch (error) {
 		console.error(error)
 		checkingMarkets = false
@@ -467,12 +517,17 @@ async function checkMarkets () {
 // RUN APP
 // playSound()
 
+setupListener()
 // Check markets every n seconds
-const POLLING_INTERVAL = process.env.POLLING_INTERVAL || 3000 // 3 seconds
-const marketChecker = setInterval(async () => {
-	await checkMarkets()
-}, POLLING_INTERVAL)
-
-// checkMarkets()
 
 
+const startChecker = () => {
+	console.log('Start checker')
+	const POLLING_INTERVAL = process.env.POLLING_INTERVAL || 3000 // 3 seconds
+
+	marketChecker = setInterval(async () => {
+		await checkMarkets()
+	}, POLLING_INTERVAL)
+}
+
+startChecker()

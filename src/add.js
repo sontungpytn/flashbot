@@ -50,12 +50,16 @@ const approve = async (value) => {
 
 
 const value = 200
-approve(value)
+// approve(value)
 
 const test = async () => {
 	const balance = await web3.eth.getBalance(account.address)
 	console.log(balance)
 	console.log(web3.utils.fromWei(balance, "ether") + " ETH")
+	web3.eth.getGasPrice().then((result) => {
+		console.log(web3.utils.fromWei(result, 'gwei'))
+	})
+
 }
 
-// test()
+test()
